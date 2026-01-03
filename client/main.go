@@ -13,7 +13,7 @@ func main() {
 	})
 	ctx := context.Background()
 
-	err := client.Set(ctx, "foo", "bar", 0).Err()
+	err := client.Set(ctx, "what", "world", 0).Err()
 	if err != nil {
 		log.Fatal("ERROR: ", err)
 	}

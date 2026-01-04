@@ -33,9 +33,26 @@ func NewServer(config Config) *Server {
 func (s *Server) handleMessage(msg Message) error {
 	switch v := msg.cmd.(type) {
 	case HelloCommand:
-	case ClientCommand:
+		spec := map[string]string{
+			"server": "redis",
+		}
 
+		b := WriteMap(spec)
+		w := NewWriter(msg.peer.conn)
+
+		if _, err := w.writer.Write(b); err != nil {
+			return err
+		}
+
+	case ClientCommand:
+		b := []byte("OK")
+		w := NewWriter(msg.peer.conn)
+
+		if _, err := w.writer.Write(b); err != nil {
+			return err
+		}
 	case SetCommand:
+		
 	case GetCommand:
 	}
 	return nil

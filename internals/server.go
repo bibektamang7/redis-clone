@@ -12,37 +12,39 @@ type Config struct {
 
 type Server struct {
 	Config
-	Listener   net.Listener
-	peers      map[*Peer]bool
-	addPeer    chan *Peer
-	deletePeer chan *Peer
-	msgCh      chan Message
-	quitCh     chan struct{}
-	kv         *KeyValue
+	Listener     net.Listener
+	peers        map[*Peer]bool
+	addPeerCh    chan *Peer
+	deletePeerCh chan *Peer
+	msgCh        chan Message
+	quitCh       chan struct{}
+	kv           *KeyValue
 }
 
 func NewServer(config Config) *Server {
 	return &Server{
-		Config:     config,
-		peers:      make(map[*Peer]bool),
-		addPeer:    make(chan *Peer),
-		deletePeer: make(chan *Peer),
-		quitCh:     make(chan struct{}),
-		kv:         NewKeyValue(),
+		Config:       config,
+		peers:        make(map[*Peer]bool),
+		addPeerCh:    make(chan *Peer),
+		msgCh:        make(chan Message),
+		deletePeerCh: make(chan *Peer),
+		quitCh:       make(chan struct{}),
+		kv:           NewKeyValue(),
 	}
 }
 
 func (s *Server) handleMessage(msg Message) error {
 	switch v := msg.cmd.(type) {
 	case HelloCommand:
-		spec := map[string]string{
-			"server": "redis",
-		}
+		// spec := map[string]string{
+		// 	"server": "redis",
+		// }
+		// TODO: HANDLE IT PROPERLY
+		val := "%3\r\n$6\r\nserver\r\n$15\r\nmy-custom-redis\r\n$7\r\nversion\r\n$5\r\n1.0.0\r\n$5\r\nproto\r\n:3\r\n"
 
-		b := WriteMap(spec)
-		w := NewWriter(msg.peer.conn)
-
-		if _, err := w.writer.Write(b); err != nil {
+		// b := WriteMap(spec)
+		// w := NewWriter(msg.peer.conn)
+		if _, err := msg.peer.conn.Write([]byte(val)); err != nil {
 			return err
 		}
 
@@ -83,10 +85,13 @@ func (s *Server) loop() {
 		case msg := <-s.msgCh:
 			if err := s.handleMessage(msg); err != nil {
 				fmt.Println("failed to handle message")
-				return
 			}
-		case p := <-s.addPeer:
+		case p := <-s.addPeerCh:
+			slog.Info("peer connected:", "remoteAddr", p.conn.RemoteAddr())
 			s.peers[p] = true
+		case p := <-s.deletePeerCh:
+			slog.Info("peer disconnected: ", "remoteAddr", p.conn.RemoteAddr())
+			delete(s.peers, p)
 		case <-s.quitCh:
 			return
 		}
@@ -106,7 +111,7 @@ func (s *Server) ListenAndServer() error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			return err
+			continue
 		}
 		go s.handleConnection(conn)
 
@@ -116,9 +121,9 @@ func (s *Server) ListenAndServer() error {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	peer := NewPeer(conn)
+	peer := NewPeer(conn, s.msgCh, s.deletePeerCh)
 
-	s.addPeer <- peer
+	s.addPeerCh <- peer
 	if err := peer.readLoop(); err != nil {
 		slog.Error("peer read error", "err", err, "remote Addr", conn.RemoteAddr().String())
 	}

@@ -7,7 +7,9 @@ import (
 )
 
 func main() {
-	s := internals.NewServer(":6379")
+	s := internals.NewServer(internals.Config{
+		Addr: ":6379",
+	})
 	err := s.ListenAndServer()
 	if err != nil {
 		log.Fatalf("error: %s\n", err.Error())

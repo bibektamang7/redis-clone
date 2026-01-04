@@ -3,22 +3,32 @@ package internals
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 )
 
 type Peer struct {
 	conn  net.Conn
 	msgCh chan Message
+	delCh chan *Peer
 }
 
-func NewPeer(conn net.Conn) *Peer {
-	return &Peer{conn: conn}
+func NewPeer(conn net.Conn, msgCh chan Message, delCh chan *Peer) *Peer {
+	return &Peer{
+		conn:  conn,
+		msgCh: msgCh,
+		delCh: delCh,
+	}
 }
 
 func (p *Peer) readLoop() error {
 	resp := NewResp(p.conn)
 	for {
 		v, err := resp.Read()
+		if err == io.EOF {
+			p.delCh <- p
+			break
+		}
 		if err != nil {
 			return err
 		}
@@ -52,15 +62,16 @@ func (p *Peer) readLoop() error {
 			}
 		}
 	}
+	return nil
 }
 
-func (p *Peer) WriteMap(m map[string]string) []byte {
+func WriteMap(m map[string]string) []byte {
 	buf := &bytes.Buffer{}
 	buf.WriteString("%" + fmt.Sprintf("%d\r\n", len(m)))
 
 	for k, v := range m {
-		buf.WriteString("%" + fmt.Sprintf("%d\r\n", len(k)))
-		buf.WriteString(fmt.Sprintf("%s\r\n", v))
+		val := "$" + fmt.Sprintf("%d\r\n", len(k+v)+1) + fmt.Sprintf("%s:%s\r\n", k, v)
+		buf.WriteString(val)
 	}
 
 	return buf.Bytes()

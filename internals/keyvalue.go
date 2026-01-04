@@ -8,7 +8,9 @@ type KeyValue struct {
 }
 
 func NewKeyValue() *KeyValue {
-	return &KeyValue{}
+	return &KeyValue{
+		Data: make(map[string][]byte),
+	}
 }
 
 func (kv *KeyValue) Set(key, value []byte) error {

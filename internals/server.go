@@ -16,6 +16,7 @@ type Server struct {
 	peers      map[*Peer]bool
 	addPeer    chan *Peer
 	deletePeer chan *Peer
+	msgCh      chan Message
 	quitCh     chan struct{}
 }
 
@@ -29,9 +30,25 @@ func NewServer(config Config) *Server {
 	}
 }
 
+func (s *Server) handleMessage(msg Message) error {
+	switch v := msg.cmd.(type) {
+	case HelloCommand:
+	case ClientCommand:
+
+	case SetCommand:
+	case GetCommand:
+	}
+	return nil
+}
+
 func (s *Server) loop() {
 	for {
 		select {
+		case msg := <-s.msgCh:
+			if err := s.handleMessage(msg); err != nil {
+				fmt.Println("failed to handle message")
+				return
+			}
 		case p := <-s.addPeer:
 			s.peers[p] = true
 		case <-s.quitCh:

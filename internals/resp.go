@@ -15,17 +15,8 @@ const (
 	ARRAY   = '*'
 )
 
-type CommandType string
-
-const (
-	CommandHello  CommandType = "hello"
-	CommandClient CommandType = "client"
-	CommandSet    CommandType = "set"
-	CommandGet    CommandType = "get"
-)
-
 type Value struct {
-	typ      CommandType
+	typ      string
 	rawValue string
 	num      int
 	bulk     string
@@ -132,3 +123,4 @@ func (r *Resp) readBulk() (Value, error) {
 
 	return v, nil
 }
+

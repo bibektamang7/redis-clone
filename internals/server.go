@@ -18,6 +18,7 @@ type Server struct {
 	deletePeer chan *Peer
 	msgCh      chan Message
 	quitCh     chan struct{}
+	kv         *KeyValue
 }
 
 func NewServer(config Config) *Server {
@@ -27,6 +28,7 @@ func NewServer(config Config) *Server {
 		addPeer:    make(chan *Peer),
 		deletePeer: make(chan *Peer),
 		quitCh:     make(chan struct{}),
+		kv:         NewKeyValue(),
 	}
 }
 
@@ -45,15 +47,32 @@ func (s *Server) handleMessage(msg Message) error {
 		}
 
 	case ClientCommand:
-		b := []byte("OK")
 		w := NewWriter(msg.peer.conn)
 
-		if _, err := w.writer.Write(b); err != nil {
+		if err := w.Write(Value{typ: "string", rawValue: "OK"}); err != nil {
 			return err
 		}
+
 	case SetCommand:
-		
+		if err := s.kv.Set(v.key, v.value); err != nil {
+			return err
+		}
+		w := NewWriter(msg.peer.conn)
+
+		if err := w.Write(Value{typ: "string", rawValue: "OK"}); err != nil {
+			return err
+		}
+
 	case GetCommand:
+		val, ok := s.kv.Get(v.key)
+		if !ok {
+			return fmt.Errorf("key not found")
+		}
+		w := NewWriter(msg.peer.conn)
+		if err := w.Write(Value{typ: "string", rawValue: string(val)}); err != nil {
+			return err
+		}
+
 	}
 	return nil
 }
